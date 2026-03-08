@@ -1,6 +1,6 @@
 """
-ScenarioGen — Direct JSON generation using Groq LLM + Pydantic validation.
-No tool calling required — works with smaller models like llama-3.1-8b-instant.
+LangChain agent for AV scenario generation using direct JSON prompting.
+Uses Groq LLM with Pydantic validation and constraint checking.
 """
 
 import os
@@ -14,11 +14,9 @@ from src.tools import check_constraints
 
 load_dotenv()
 
-# ── Prompts ───────────────────────────────────────────────────────────────────
-
 BASE_SYSTEM_PROMPT = """You are an AV scenario engineer. Convert natural language into a JSON simulation config.
 
-Return ONLY a valid JSON object with this exact structure — no explanation, no markdown, no backticks:
+Return ONLY a valid JSON object with this exact structure, no explanation, no markdown, no backticks:
 {
   "scenario_id": "auto",
   "description": "<original input>",
@@ -59,14 +57,12 @@ COT_SUFFIX = """
 Before writing JSON, think through:
 1. What actors are present and what type?
 2. What speed fits each actor's behavior?
-3. What environment — time, weather, road type?
+3. What environment, time, weather, road type?
 4. Where should actors be positioned (5-30m apart)?
 Then output ONLY the JSON."""
 
 
-# ── LLM factory ───────────────────────────────────────────────────────────────
-
-def build_llm() -> ChatGroq:
+def build_llm():
     return ChatGroq(
         model="llama-3.1-8b-instant",
         groq_api_key=os.getenv("GROQ_API_KEY"),
@@ -74,10 +70,7 @@ def build_llm() -> ChatGroq:
     )
 
 
-# ── Core generation ───────────────────────────────────────────────────────────
-
-def _invoke_with_retry(llm, messages, max_retries=3):
-    """Invoke LLM with rate-limit retry."""
+def invoke_with_retry(llm, messages, max_retries=3):
     for attempt in range(max_retries):
         try:
             return llm.invoke(messages)
@@ -85,16 +78,14 @@ def _invoke_with_retry(llm, messages, max_retries=3):
             err = str(e)
             if "rate_limit" in err.lower() or "429" in err:
                 wait = 20 * (attempt + 1)
-                print(f"[Agent] Rate limit — waiting {wait}s...")
+                print("Rate limit reached, waiting " + str(wait) + "s...")
                 time.sleep(wait)
             else:
                 raise
     raise RuntimeError("Max retries exceeded")
 
 
-def _extract_json(text: str) -> dict | None:
-    """Extract first valid JSON object from text."""
-    # Strip markdown code fences if present
+def extract_json(text):
     text = text.replace("```json", "").replace("```", "").strip()
     start = text.find("{")
     end = text.rfind("}") + 1
@@ -106,41 +97,37 @@ def _extract_json(text: str) -> dict | None:
         return None
 
 
-def _apply_constraints(data) -> dict:
-    """Run constraint checker and return fixed scenario data."""
+def apply_constraints(data):
     payload = data if isinstance(data, str) else json.dumps(data)
     result = json.loads(check_constraints.invoke({"scenario_json": payload}))
     fixed = result.get("fixed_scenario") or data
     if result.get("warnings"):
         for w in result["warnings"]:
-            print(f"[Constraints] {w}")
+            print("Constraint warning: " + w)
     return fixed
 
 
-def _validate(data: dict, description: str) -> ScenarioConfig | None:
-    """Try to build a validated ScenarioConfig from raw dict."""
+def validate_config(data, description):
     import uuid
     try:
         data["scenario_id"] = str(uuid.uuid4())[:8]
         data["description"] = description
         return ScenarioConfig(**data)
     except Exception as e:
-        print(f"[Validation] Failed: {e}")
+        print("Validation failed: " + str(e))
         return None
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
-
-def generate_scenario(description: str, strategy: str = "zero_shot") -> dict:
+def generate_scenario(description, strategy="zero_shot"):
     """
     Generate a validated ScenarioConfig from a natural language description.
 
     Args:
-        description: NL scenario description
-        strategy: "zero_shot", "few_shot", or "cot"
+        description: natural language scenario description
+        strategy: one of zero_shot, few_shot, or cot
 
     Returns:
-        dict with 'scenario', 'raw_output', 'strategy', 'input'
+        dict with scenario, raw_output, strategy, and input keys
     """
     system = BASE_SYSTEM_PROMPT
     if strategy == "few_shot":
@@ -151,34 +138,31 @@ def generate_scenario(description: str, strategy: str = "zero_shot") -> dict:
     llm = build_llm()
     messages = [SystemMessage(content=system), HumanMessage(content=description)]
 
-    print(f"\n[Agent] Strategy: {strategy}")
-    print(f"[Agent] Input: {description}")
+    print("Strategy: " + strategy)
+    print("Input: " + description)
 
-    # Retry up to 3 times if JSON is invalid
     raw_output = ""
     scenario_config = None
 
     for attempt in range(3):
-        response = _invoke_with_retry(llm, messages)
+        response = invoke_with_retry(llm, messages)
         raw_output = response.content
-        print(f"[Agent] Attempt {attempt+1} — got response")
+        print("Attempt " + str(attempt + 1) + " got response")
 
-        data = _extract_json(raw_output)
+        data = extract_json(raw_output)
         if not data:
-            print(f"[Agent] No JSON found, retrying...")
+            print("No JSON found, retrying...")
             messages.append(response)
             messages.append(HumanMessage(
                 content="Your response did not contain valid JSON. Return ONLY the JSON object, nothing else."
             ))
             continue
 
-        # Apply constraint fixes
-        fixed = _apply_constraints(data)
+        fixed = apply_constraints(data)
+        scenario_config = validate_config(fixed, description)
 
-        # Validate with Pydantic
-        scenario_config = _validate(fixed, description)
         if scenario_config:
-            print(f"[Agent] ✅ Valid scenario generated")
+            print("Valid scenario generated")
             break
         else:
             messages.append(response)
