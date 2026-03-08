@@ -1,0 +1,23 @@
+{
+  "scenario_id": "a761a7e3",
+  "description": "a pedestrian jaywalks at night in rain",
+  "ego_vehicle_speed_mps": 0.0,
+  "actors": [
+    {
+      "actor_type": "pedestrian",
+      "start_position": [
+        15.0,
+        15.0
+      ],
+      "heading_degrees": 270.0,
+      "speed_mps": 2.0,
+      "behavior": "jaywalking"
+    }
+  ],
+  "environment": {
+    "time_of_day": "night",
+    "weather": "rain",
+    "road_type": "residential"
+  },
+  "duration_seconds": 10.0
+}

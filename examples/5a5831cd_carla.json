@@ -1,0 +1,41 @@
+{
+  "scenario_id": "5a5831cd",
+  "description": "a pedestrian jaywalks at night in rain",
+  "map": "Town01",
+  "duration_seconds": 10.0,
+  "weather": {
+    "preset": "carla.WeatherParameters.HardRainNoon",
+    "sun_altitude_angle": -30.0,
+    "precipitation": 80.0,
+    "fog_density": 20.0
+  },
+  "time_of_day": {
+    "hour": 22,
+    "minute": 0
+  },
+  "ego_vehicle": {
+    "blueprint": "vehicle.tesla.model3",
+    "spawn": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.5,
+      "yaw": 90.0
+    },
+    "speed_mps": 20.0
+  },
+  "actors": [
+    {
+      "id": "actor_0",
+      "blueprint": "walker.pedestrian.0001",
+      "actor_type": "pedestrian",
+      "behavior": "jaywalking",
+      "spawn": {
+        "x": 15.0,
+        "y": 15.0,
+        "z": 0.5,
+        "yaw": 90.0
+      },
+      "speed_mps": 2.5
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "scenario_id": "d0ec4fc1",
+  "description": "a pedestrian jaywalks at night during heavy rain while a cyclist cuts across an intersection",
+  "ego_vehicle_speed_mps": 15.0,
+  "actors": [
+    {
+      "actor_type": "pedestrian",
+      "start_position": [
+        10.0,
+        10.0
+      ],
+      "heading_degrees": 90.0,
+      "speed_mps": 1.5,
+      "behavior": "jaywalks"
+    },
+    {
+      "actor_type": "cyclist",
+      "start_position": [
+        20.0,
+        20.0
+      ],
+      "heading_degrees": 180.0,
+      "speed_mps": 5.0,
+      "behavior": "cuts across intersection"
+    }
+  ],
+  "environment": {
+    "time_of_day": "night",
+    "weather": "rain",
+    "road_type": "intersection"
+  },
+  "duration_seconds": 10.0
+}
