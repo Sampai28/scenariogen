@@ -1,6 +1,6 @@
 """
-ScenarioGen — Pydantic schema definitions for AV simulation scenarios.
-All generated configs must pass validation before being used.
+Pydantic schema definitions for AV simulation scenarios.
+All generated configs must pass validation before being used downstream.
 """
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -38,18 +38,17 @@ class Actor(BaseModel):
 
     @model_validator(mode="after")
     def check_speed_by_actor_type(self):
-        """Enforce realistic max speeds per actor type."""
         limits = {
-            "vehicle": 50.0,       # ~180 km/h
-            "motorcycle": 50.0,    # ~180 km/h
-            "cyclist": 12.0,       # ~43 km/h
-            "pedestrian": 3.0,     # ~11 km/h (sprinting)
+            "vehicle": 50.0,
+            "motorcycle": 50.0,
+            "cyclist": 12.0,
+            "pedestrian": 3.0,
         }
         limit = limits[self.actor_type]
         if self.speed_mps > limit:
             raise ValueError(
-                f"{self.actor_type} speed {self.speed_mps} m/s exceeds "
-                f"max allowed {limit} m/s"
+                self.actor_type + " speed " + str(self.speed_mps) +
+                " m/s exceeds max allowed " + str(limit) + " m/s"
             )
         return self
 
@@ -63,7 +62,7 @@ class Environment(BaseModel):
 class ScenarioConfig(BaseModel):
     scenario_id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     description: str
-    ego_vehicle_speed_mps: float = Field(ge=0, le=50)  # ego car speed
+    ego_vehicle_speed_mps: float = Field(ge=0, le=50)
     actors: List[Actor] = Field(min_length=1, max_length=6)
     environment: Environment
     duration_seconds: float = Field(gt=0, le=60)
@@ -77,24 +76,20 @@ class ScenarioConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_highway_speed(self):
-        """Ego vehicle on highway should be going at least 20 m/s."""
         if (
             self.environment.road_type == "highway"
             and self.ego_vehicle_speed_mps < 20
         ):
             raise ValueError(
-                "Ego vehicle speed on highway should be at least 20 m/s "
-                f"(got {self.ego_vehicle_speed_mps})"
+                "Ego vehicle speed on highway should be at least 20 m/s, got " +
+                str(self.ego_vehicle_speed_mps)
             )
         return self
 
     @model_validator(mode="after")
     def no_pedestrians_on_highway(self):
-        """Pedestrians should not appear on highways."""
         if self.environment.road_type == "highway":
             for actor in self.actors:
                 if actor.actor_type == "pedestrian":
-                    raise ValueError(
-                        "Pedestrians cannot appear in highway scenarios"
-                    )
+                    raise ValueError("Pedestrians cannot appear in highway scenarios")
         return self
