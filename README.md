@@ -2,7 +2,7 @@
 
 Convert natural language driving descriptions into validated simulation configs for autonomous vehicle safety testing.
 
-**Built for**: AV safety validation pipelines (CARLA, custom simulators)  
+**Built for**: AV safety validation pipelines (CARLA, ROS 2 / Gazebo, custom simulators)  
 **Stack**: Python · LangChain · Groq (Llama 3.1) · Pydantic v2 · Matplotlib · Streamlit
 
 ---
@@ -45,7 +45,7 @@ LangChain LLM (Groq / Llama 3.1-8b)
       ↓
 Validated ScenarioConfig (JSON)
       ↓
-BEV Visualization (Matplotlib PNG) + CARLA Export
+BEV Visualization (Matplotlib PNG) + CARLA Export / ROS 2 Launch File
 ```
 
 ### Design Decisions
@@ -68,6 +68,7 @@ Pydantic's `field_validator` and `model_validator` let us encode domain knowledg
 - Pydantic v2 schema with cross-field validators (highway speed, actor count)
 - Bird's-eye-view visualization — actors as labeled arrows on a 2D road grid
 - CARLA export — generates ready-to-run Python scripts + JSON configs
+- ROS 2 export — generates Python launch files for Gazebo simulation
 - Scenario mutator — generates edge case variants from existing scenarios
 - 3 prompting strategies — zero-shot, few-shot, chain-of-thought
 - Streamlit UI — interactive demo with download buttons
@@ -101,11 +102,14 @@ GROQ_API_KEY=your_key_here
 # Basic
 python main.py --input "a cyclist runs a red light at a foggy intersection"
 
-# With strategy
+# With prompting strategy
 python main.py --input "..." --strategy few_shot
 
-# With CARLA export
+# Export to CARLA
 python main.py --input "..." --carla
+
+# Export to ROS 2 / Gazebo
+python main.py --input "..." --ros
 
 # Skip visualization
 python main.py --input "..." --no-viz
@@ -128,6 +132,21 @@ python evals/ablation.py
 
 ---
 
+## Export Formats
+
+### CARLA
+Generates a ready-to-run Python script and JSON config for the CARLA simulator. Use `--carla` on the CLI or the CARLA export button in the Streamlit UI.
+
+### ROS 2 / Gazebo
+Generates a Python-based ROS 2 launch file (`scenario_launch.py`) that:
+- Launches Gazebo with the appropriate world file for the scenario's road type
+- Spawns the ego vehicle and all actors at their configured positions and headings
+- Applies weather and lighting parameters via Gazebo plugins
+
+Use `--ros` on the CLI or the ROS 2 export button in the Streamlit UI. The launch file is written to the current directory by default.
+
+---
+
 ## Project Structure
 
 ```
@@ -137,19 +156,19 @@ scenariogen/
 │   ├── tools.py           # LangChain tools (constraint checker, config generator)
 │   ├── agent.py           # LLM agent + generation pipeline
 │   ├── visualizer.py      # Matplotlib BEV renderer
-│   └── carla_export.py    # CARLA script + JSON exporter
+│   ├── carla_export.py    # CARLA script + JSON exporter
+│   └── ros_export.py      # ROS 2 / Gazebo launch file exporter
 ├── examples/              # Pre-generated scenario JSONs + BEV PNGs
 ├── evals/
 │   ├── ablation.py        # Ablation study runner
 │   ├── ablation_results.json
 │   └── ablation_table.md  # Results table
 ├── tests/
-│   └── test_schema.py     # Pytest schema validation tests
+│   ├── test_schema.py     # Pytest schema validation tests
+│   └── test_ros_export.py # Pytest ROS 2 export tests
 ├── app.py                 # Streamlit UI
 ├── main.py                # CLI entry point
 └── requirements.txt
 ```
 
 ---
-
-
